@@ -1,0 +1,128 @@
+# Importación de librerías necesarias
+import time  # Para manejar retrasos temporales en el código
+from typing import Any  # Para permitir tipado genérico
+from selenium import webdriver  # Control del navegador web
+from selenium.webdriver.common.by import By  # Localización de elementos en la página
+from selenium.webdriver.common.action_chains import ActionChains  # Para realizar secuencias de acciones en la página
+from selenium.webdriver.support.wait import WebDriverWait  # Manejo de espera explícita
+from selenium.webdriver.support import expected_conditions as EC  # Condiciones para las esperas explícitas
+from selenium.webdriver.common.keys import Keys  # Para enviar pulsaciones de teclas
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities  # Para configurar capacidades del navegador
+
+# Definición de la clase SeleniumBot, que automatiza la interacción con WhatsApp Web
+class SeleniumBot():
+    def __init__(self, options: Any, data_dict: dict) -> None:
+        """
+        Inicializa el bot con las opciones del navegador y un diccionario de datos para mensajes.
+        
+        Args:
+            options (Any): Opciones de configuración para el navegador Chrome.
+            data_dict (dict): Diccionario que contiene números de teléfono o nombres de grupos como claves, 
+                              y los mensajes a enviar como valores.
+        """
+        # Inicializa el controlador de Chrome con las opciones especificadas
+        self.driver = webdriver.Chrome(options=options)
+        self.data_dict = data_dict  # Almacena el diccionario de datos
+        self.vars = {}  # Variable auxiliar para guardar datos adicionales
+
+    def teardown_method(self) -> None:
+        """
+        Cierra el navegador al finalizar el uso del bot.
+        """
+        self.driver.quit()  # Cierra el navegador
+
+    def wait_for(self, timeout: int = 10, values: tuple = (By.CSS_SELECTOR, ".selectable-text")) -> None:
+        """
+        Espera explícita hasta que un elemento esté presente en la página.
+        
+        Args:
+            timeout (int): Tiempo máximo de espera (por defecto 10 segundos).
+            values (tuple): Tupla que contiene el tipo de selector y el valor del selector para localizar el elemento.
+        """
+        # Espera hasta que el elemento especificado esté presente en la página
+        WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located(values))
+
+    def find_elementV2(self, values: tuple) -> Any:
+        """
+        Encuentra un elemento en la página web después de esperar a que esté presente.
+        
+        Args:
+            values (tuple): Tupla que contiene el tipo de selector y el valor del selector para localizar el elemento.
+        
+        Returns:
+            Any: El elemento web encontrado.
+        """
+        self.wait_for(timeout=15, values=values)  # Espera hasta que el elemento esté presente
+        return self.driver.find_element(values[0], values[1])  # Devuelve el elemento encontrado
+
+    def find_chat(self, number_or_groupid: str) -> None:
+        """
+        Busca y selecciona un chat en WhatsApp Web utilizando el número de teléfono o el ID del grupo.
+        
+        Args:
+            number_or_groupid (str): Número de teléfono o ID del grupo a buscar.
+        """
+        # Encuentra la barra de búsqueda de chat
+        element = self.find_elementV2(values=(By.CSS_SELECTOR, ".selectable-text"))
+        element.click()  # Hace clic en la barra de búsqueda
+        element.send_keys(number_or_groupid)  # Escribe el número o ID en la barra de búsqueda
+        element.send_keys(Keys.ENTER)  # Presiona Enter para seleccionar el chat
+
+    def send_message(self, message: str) -> None:
+        """
+        Envía un mensaje en el chat seleccionado.
+        
+        Args:
+            message (str): Mensaje a enviar. Puede ser una cadena de texto o una lista de cadenas.
+        """
+        if isinstance(message, list):  # Si el mensaje es una lista, envía cada elemento de la lista
+            for msg in message:
+                # Encuentra el cuadro de texto del chat y envía el mensaje
+                element = self.find_elementV2(values=(By.CSS_SELECTOR, ".\\_3Uu1_ .selectable-text"))
+                element.send_keys(msg)
+                element.send_keys(Keys.ENTER)
+        else:  # Si el mensaje es una cadena, envía el mensaje directamente
+            element = self.find_elementV2(values=(By.CSS_SELECTOR, ".\\_3Uu1_ .selectable-text"))
+            element.send_keys(message)
+            element.send_keys(Keys.ENTER)
+
+    def send_message_for_all(self) -> None:
+        """
+        Envía los mensajes a todos los contactos o grupos especificados en el diccionario de datos.
+        """
+        for key, values in self.data_dict.items():  # Itera sobre el diccionario de datos
+            self.find_chat(number_or_groupid=key)  # Encuentra el chat correspondiente
+            self.send_message(values)  # Envía el mensaje al chat
+
+    def close_tab(self) -> None:
+        """
+        Cierra la pestaña del navegador después de un pequeño retraso.
+        """
+        time.sleep(1)  # Espera 1 segundo antes de cerrar el navegador
+        self.driver.quit()  # Cierra el navegador
+
+    def run_sending(self) -> None:
+        """
+        Inicia el proceso de envío de mensajes en WhatsApp Web.
+        """
+        self.driver.get("https://web.whatsapp.com/")  # Abre WhatsApp Web
+        self.driver.set_window_size(1936, 1048)  # Ajusta el tamaño de la ventana del navegador
+        self.send_message_for_all()  # Envía mensajes a todos los contactos o grupos
+        self.close_tab()  # Cierra la pestaña del navegador
+
+# Bloque principal para ejecutar el bot
+if __name__ == '__main__':
+    # Datos de prueba: un diccionario con números de teléfono o nombres de usuarios/grupos y mensajes a enviar
+    data_dict_test = {'tel_number': ['hola', 'cómo', 'estás?'],
+                      'name_of_user or name_of_group': ['hi', 'how', 'are', 'you?']}
+    
+    # Configuración del navegador Chrome
+    options = webdriver.ChromeOptions()
+    # Especifica la ruta al perfil de Chrome para evitar volver a iniciar sesión en WhatsApp Web
+    options.add_argument("--user-data-dir=C:\\Users\\username\\AppData\\Local\\Google\\Chrome\\User Data")
+    
+    # Inicializa el bot con las opciones y datos de prueba
+    bot = SeleniumBot(options=options, data_dict=data_dict_test)
+    
+    # Ejecuta el proceso de envío de mensajes
+    bot.run_sending()
